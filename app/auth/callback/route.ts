@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: Parameters<ReturnType<typeof cookies>["set"]>[2];
+};
 
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
 
   const cookieStore = cookies();
-  const response = NextResponse.redirect(new URL("/events", requestUrl.origin));
-
-  if (!code) return response;
+  const response = NextResponse.redirect(new URL("/", request.url));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +21,7 @@ export async function GET(request: Request) {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: (all) => {
+        setAll: (all: CookieToSet[]) => {
           all.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
           });
@@ -26,8 +30,9 @@ export async function GET(request: Request) {
     }
   );
 
-  // Exchanges the code from the email link for a session and sets auth cookies
-  await supabase.auth.exchangeCodeForSession(code);
+  if (code) {
+    await supabase.auth.exchangeCodeForSession(code);
+  }
 
   return response;
 }
