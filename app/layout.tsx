@@ -1,8 +1,9 @@
 import "./globals.css";
+import TopNav from "@/components/TopNav";
 
 export const metadata = {
   title: "Staycation Journal",
-  description: "Private Disney-first memory journal"
+  description: "Our Memory Spot"
 };
 
 export default function RootLayout({
