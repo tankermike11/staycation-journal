@@ -15,6 +15,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="app-shell">
         <div className="app-container">
+<div style={{ padding: 12, background: "red", color: "white", fontWeight: 800 }}>
+  LAYOUT IS RENDERING
+</div>
           {children}
         </div>
       </body>
