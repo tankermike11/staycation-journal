@@ -1,0 +1,177 @@
+/* app/globals.css */
+
+/* Tailwind layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -----------------------------
+   Base (A: warm editorial shell)
+------------------------------ */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-gradient-to-b from-neutral-50 to-white text-gray-900 antialiased;
+  }
+
+  /* Better default typography */
+  h1, h2, h3, h4 {
+    @apply tracking-tight;
+  }
+
+  /* Subtle selection tint (amber) */
+  ::selection {
+    background: rgba(245, 158, 11, 0.25); /* amber-500 @ 25% */
+  }
+
+  /* Nicer focus ring */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35);
+    border-radius: 12px;
+  }
+}
+
+/* -----------------------------------------
+   Components (B: soft surfaces + cohesion)
+   + (C: tasteful amber accents)
+------------------------------------------ */
+@layer components {
+  /* Page container + spacing (mobile-first) */
+  .app-shell {
+    @apply min-h-screen;
+  }
+
+  .app-container {
+    @apply mx-auto w-full max-w-4xl px-4 py-6 sm:px-6;
+  }
+
+  /* Editorial page header */
+  .page-hero {
+    @apply rounded-3xl border border-gray-200/70 bg-gradient-to-b from-white to-gray-50 p-6 shadow-sm sm:p-8;
+  }
+
+  .page-title {
+    @apply text-3xl font-extrabold tracking-tight sm:text-4xl;
+  }
+
+  .page-subtitle {
+    @apply mt-2 max-w-2xl text-sm text-gray-600;
+  }
+
+  /* Cards */
+  .card-soft {
+    @apply rounded-3xl border border-gray-200/70 bg-white shadow-sm;
+  }
+
+  .card-soft-hover {
+    @apply card-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  /* Section header */
+  .section-title {
+    @apply text-xl font-extrabold tracking-tight sm:text-2xl;
+  }
+
+  .muted {
+    @apply text-gray-600;
+  }
+
+  /* Buttons (primary neutral, amber accent, soft) */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-extrabold shadow-sm transition
+           focus-visible:outline-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-gray-900 text-white hover:bg-gray-800;
+  }
+
+  .btn-secondary {
+    @apply btn border border-gray-200 bg-white text-gray-900 hover:bg-gray-50;
+  }
+
+  .btn-amber {
+    @apply btn bg-amber-500 text-gray-950 hover:bg-amber-600;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-gray-900 hover:bg-gray-100;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+
+  /* Inputs */
+  .input {
+    @apply w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm
+           placeholder:text-gray-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-200;
+  }
+
+  .textarea {
+    @apply input min-h-[96px] resize-y;
+  }
+
+  /* Chips / badges (Disney-forward, not cheesy) */
+  .chip {
+    @apply inline-flex items-center rounded-full border border-gray-200 bg-white/80 px-3 py-1 text-[11px]
+           font-extrabold tracking-wide text-gray-800 shadow-sm;
+  }
+
+  .chip-amber {
+    @apply chip border-amber-200 bg-amber-50 text-amber-900;
+  }
+
+  /* Subtle divider */
+  .divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent;
+  }
+
+  /* Photo tile */
+  .photo-tile {
+    @apply relative aspect-square overflow-hidden rounded-2xl bg-gray-100;
+  }
+
+  .photo-img {
+    @apply h-full w-full object-cover transition-transform duration-300;
+  }
+
+  .photo-tile:hover .photo-img {
+    @apply scale-105;
+  }
+
+  /* Sticky utility for toggles/filters on mobile */
+  .sticky-bar {
+    @apply sticky top-0 z-10 -mx-2 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-white/70;
+  }
+
+  /* Amber accent underline link */
+  .link-amber {
+    @apply font-semibold text-amber-700 hover:text-amber-800;
+  }
+}
+
+/* -----------------------------------------
+   Utilities (small helpers)
+------------------------------------------ */
+@layer utilities {
+  .shadow-soft {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 10px 30px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Better iOS tap highlight */
+  .tap-clear {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
