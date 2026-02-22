@@ -18,6 +18,61 @@ type ImgDTO = {
   sort_index: number;
 };
 
+// ---- client-side resize/compress helpers (to avoid 413 on Vercel) ----
+async function fileToBitmap(file: File): Promise<ImageBitmap> {
+  // ImageBitmap keeps EXIF orientation in modern browsers when using imageOrientation: "from-image"
+  // Falls back gracefully if not supported.
+  // @ts-ignore
+  return await createImageBitmap(file, { imageOrientation: "from-image" });
+}
+
+function fitWithin(w: number, h: number, maxDim: number) {
+  if (w <= maxDim && h <= maxDim) return { w, h };
+  const scale = maxDim / Math.max(w, h);
+  return { w: Math.round(w * scale), h: Math.round(h * scale) };
+}
+
+async function compressImageFile(
+  file: File,
+  opts: { maxDim: number; quality: number; maxBytes: number }
+): Promise<File> {
+  // Only compress images; if not, return original.
+  if (!file.type.startsWith("image/")) return file;
+
+  // If already under maxBytes, skip.
+  if (file.size <= opts.maxBytes) return file;
+
+  const bmp = await fileToBitmap(file);
+  const { w, h } = fitWithin(bmp.width, bmp.height, opts.maxDim);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+
+  ctx.drawImage(bmp, 0, 0, w, h);
+
+  // Prefer JPEG output for size; keep PNG if the input is PNG AND small enough already (but we’re here because it’s big)
+  const outType = "image/jpeg";
+
+  const blob: Blob = await new Promise((resolve) => {
+    canvas.toBlob(
+      (b) => resolve(b ?? file),
+      outType,
+      opts.quality
+    );
+  });
+
+  // If compression didn't help (rare), return original
+  if (!(blob instanceof Blob) || blob.size >= file.size) return file;
+
+  const baseName = file.name.replace(/\.[^.]+$/, "");
+  const outName = `${baseName}.jpg`;
+
+  return new File([blob], outName, { type: outType });
+}
+
 export default function AdminDay({ params }: { params: { id: string } }) {
   const dayId = params.id;
 
@@ -32,6 +87,7 @@ export default function AdminDay({ params }: { params: { id: string } }) {
   const [uploading, setUploading] = useState(false);
   const [uploadDone, setUploadDone] = useState(0);
   const [uploadTotal, setUploadTotal] = useState(0);
+  const [stage, setStage] = useState<"" | "compressing" | "uploading">("");
 
   async function refresh() {
     const resp = await fetch(`/api/admin/day?dayId=${encodeURIComponent(dayId)}`);
@@ -85,7 +141,7 @@ export default function AdminDay({ params }: { params: { id: string } }) {
     e.preventDefault();
     if (!files || files.length === 0) return;
 
-    // Upload one-by-one to avoid Vercel body size limits (413 on multi-file)
+    // One-by-one upload + client-side compression to avoid 413 per-file limits
     setBusy(true);
     setUploading(true);
     setMsg(null);
@@ -98,14 +154,25 @@ export default function AdminDay({ params }: { params: { id: string } }) {
     let failed = 0;
 
     try {
-      for (const f of list) {
+      for (const raw of list) {
+        setStage("compressing");
+
+        // Aim to keep each request comfortably under typical limits.
+        // maxBytes is our "skip compression if already small" threshold.
+        const file = await compressImageFile(raw, {
+          maxDim: 2400,
+          quality: 0.86,
+          maxBytes: 2_700_000 // ~2.7MB
+        });
+
+        setStage("uploading");
+
         const fd = new FormData();
         fd.append("dayId", dayId);
-        fd.append("files", f);
+        fd.append("files", file);
 
         const resp = await fetch("/api/upload", { method: "POST", body: fd });
 
-        // Don't assume JSON on error (could be text/HTML)
         const text = await resp.text();
         let out: any = null;
         try {
@@ -117,6 +184,12 @@ export default function AdminDay({ params }: { params: { id: string } }) {
         if (!resp.ok) {
           failed++;
           console.error("Upload failed:", out?.error ?? text);
+          // If this is still 413, give a clearer message
+          if (resp.status === 413) {
+            setMsg(
+              "One photo is still too large after compression. Try again or reduce the photo size (e.g., take a screenshot and upload the screenshot)."
+            );
+          }
         } else {
           ok++;
         }
@@ -125,15 +198,14 @@ export default function AdminDay({ params }: { params: { id: string } }) {
       }
 
       if (failed === 0) setMsg(`Uploaded ${ok} photo(s).`);
-      else setMsg(`Uploaded ${ok} photo(s). ${failed} failed (see console).`);
+      else if (!msg) setMsg(`Uploaded ${ok} photo(s). ${failed} failed (see console).`);
 
       setFiles(null);
-      // NOTE: we intentionally avoid using ref={...} on <Input />
-      // because your custom Input component likely does not forwardRef.
       refresh();
     } catch (err: any) {
       setMsg(err?.message ?? "Upload error.");
     } finally {
+      setStage("");
       setUploading(false);
       setBusy(false);
     }
@@ -226,11 +298,7 @@ export default function AdminDay({ params }: { params: { id: string } }) {
 
           <div>
             <label className="text-sm font-semibold">Notes</label>
-            <TextArea
-              rows={3}
-              value={day.notes ?? ""}
-              onChange={(e) => setDay({ ...day, notes: e.target.value })}
-            />
+            <TextArea rows={3} value={day.notes ?? ""} onChange={(e) => setDay({ ...day, notes: e.target.value })} />
           </div>
 
           <Button disabled={busy}>{busy ? "Saving…" : "Save Day"}</Button>
@@ -241,24 +309,19 @@ export default function AdminDay({ params }: { params: { id: string } }) {
         <form onSubmit={upload} className="grid gap-3">
           <div className="text-lg font-extrabold tracking-tight">Upload photos</div>
 
-          <Input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={(e) => setFiles(e.target.files)}
-          />
+          <Input type="file" multiple accept="image/*" onChange={(e) => setFiles(e.target.files)} />
 
           {uploading ? (
             <div className="text-sm text-gray-600">
-              Uploading {uploadDone}/{uploadTotal}…
+              {stage === "compressing" ? "Compressing…" : "Uploading…"} {uploadDone}/{uploadTotal}
             </div>
           ) : null}
 
-          <Button disabled={busy || !files || files.length === 0}>
-            {uploading ? "Uploading…" : "Upload"}
-          </Button>
+          <Button disabled={busy || !files || files.length === 0}>{uploading ? "Working…" : "Upload"}</Button>
 
-          <p className="text-xs text-gray-500">Tip: uploads are sent one-at-a-time to avoid server limits.</p>
+          <p className="text-xs text-gray-500">
+            Tip: photos are compressed and uploaded one-at-a-time to avoid server limits.
+          </p>
         </form>
       </Card>
 

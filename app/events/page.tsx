@@ -43,9 +43,9 @@ export default async function EventsHome() {
   return (
     <div className="grid gap-8">
       <div className="rounded-3xl border border-gray-200/70 bg-gradient-to-b from-gray-50 to-white p-8 shadow-soft">
-        <h1 className="text-4xl font-extrabold tracking-tight">Events</h1>
+        <h1 className="text-4xl font-extrabold tracking-tight">Our Non-house Fun Activities</h1>
         <p className="mt-2 max-w-2xl text-sm text-gray-600">
-          A private highlight reel of staycations, trips, and cruises — organized by event → day → photos.
+          Private highlights of our staycations, trips, and cruises — organized by event → day → photos.
         </p>
       </div>
 

@@ -58,10 +58,10 @@ export default function TopNav() {
       <div className="app-container">
         <div className="flex items-center justify-between py-3">
           <Link href={authed ? "/events" : "/login"} className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-2xl bg-amber-200" />
+            
             <div className="leading-tight">
               <div className="text-sm font-extrabold tracking-tight">Staycation Journal</div>
-              <div className="text-[11px] text-gray-600">Private highlights</div>
+              <div className="text-[11px] text-gray-600">Our Memory Spot</div>
             </div>
           </Link>
 
