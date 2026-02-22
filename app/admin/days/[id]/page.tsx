@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card, Input, TextArea } from "@/components/ui";
 import { formatDateLongUTC } from "@/lib/date";
 
@@ -28,6 +28,13 @@ export default function AdminDay({ params }: { params: { id: string } }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // upload progress state
+  const [uploading, setUploading] = useState(false);
+  const [uploadDone, setUploadDone] = useState(0);
+  const [uploadTotal, setUploadTotal] = useState(0);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   async function refresh() {
     const resp = await fetch(`/api/admin/day?dayId=${encodeURIComponent(dayId)}`);
     const out = await resp.json();
@@ -47,6 +54,7 @@ export default function AdminDay({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function saveDay(e: React.FormEvent) {
@@ -79,24 +87,55 @@ export default function AdminDay({ params }: { params: { id: string } }) {
     e.preventDefault();
     if (!files || files.length === 0) return;
 
+    // Upload one-by-one to avoid Vercel body size limits (413 on multi-file)
     setBusy(true);
+    setUploading(true);
     setMsg(null);
 
+    const list = Array.from(files);
+    setUploadTotal(list.length);
+    setUploadDone(0);
+
+    let ok = 0;
+    let failed = 0;
+
     try {
-      const fd = new FormData();
-      fd.append("dayId", dayId);
-      Array.from(files).forEach((f) => fd.append("files", f));
+      for (const f of list) {
+        const fd = new FormData();
+        fd.append("dayId", dayId);
+        fd.append("files", f);
 
-      const resp = await fetch("/api/upload", { method: "POST", body: fd });
-      const out = await resp.json();
-      if (!resp.ok) throw new Error(out.error ?? "Upload failed.");
+        const resp = await fetch("/api/upload", { method: "POST", body: fd });
 
-      setMsg(`Uploaded ${out.count} photo(s).`);
+        // Don't assume JSON on error (could be text/HTML)
+        const text = await resp.text();
+        let out: any = null;
+        try {
+          out = JSON.parse(text);
+        } catch {
+          out = { error: text };
+        }
+
+        if (!resp.ok) {
+          failed++;
+          console.error("Upload failed:", out?.error ?? text);
+        } else {
+          ok++;
+        }
+
+        setUploadDone((n) => n + 1);
+      }
+
+      if (failed === 0) setMsg(`Uploaded ${ok} photo(s).`);
+      else setMsg(`Uploaded ${ok} photo(s). ${failed} failed (see console).`);
+
       setFiles(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       refresh();
     } catch (err: any) {
       setMsg(err?.message ?? "Upload error.");
     } finally {
+      setUploading(false);
       setBusy(false);
     }
   }
@@ -168,28 +207,21 @@ export default function AdminDay({ params }: { params: { id: string } }) {
     <div className="grid gap-6">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Manage Day</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          {formatDateLongUTC(day.date)}
-        </p>
+        <p className="mt-2 text-sm text-gray-600">{formatDateLongUTC(day.date)}</p>
       </div>
 
       <Card className="p-6">
         <form onSubmit={saveDay} className="grid gap-4">
           <div>
             <label className="text-sm font-semibold">Title</label>
-            <Input
-              value={day.title ?? ""}
-              onChange={(e) => setDay({ ...day, title: e.target.value })}
-            />
+            <Input value={day.title ?? ""} onChange={(e) => setDay({ ...day, title: e.target.value })} />
           </div>
 
           <div>
             <label className="text-sm font-semibold">Locations</label>
             <Input
               value={day.locations_text ?? ""}
-              onChange={(e) =>
-                setDay({ ...day, locations_text: e.target.value })
-              }
+              onChange={(e) => setDay({ ...day, locations_text: e.target.value })}
             />
           </div>
 
@@ -198,9 +230,7 @@ export default function AdminDay({ params }: { params: { id: string } }) {
             <TextArea
               rows={3}
               value={day.notes ?? ""}
-              onChange={(e) =>
-                setDay({ ...day, notes: e.target.value })
-              }
+              onChange={(e) => setDay({ ...day, notes: e.target.value })}
             />
           </div>
 
@@ -210,25 +240,34 @@ export default function AdminDay({ params }: { params: { id: string } }) {
 
       <Card className="p-6">
         <form onSubmit={upload} className="grid gap-3">
-          <div className="text-lg font-extrabold tracking-tight">
-            Upload photos
-          </div>
+          <div className="text-lg font-extrabold tracking-tight">Upload photos</div>
+
           <Input
+            ref={fileInputRef}
             type="file"
             multiple
             accept="image/*"
             onChange={(e) => setFiles(e.target.files)}
           />
+
+          {uploading ? (
+            <div className="text-sm text-gray-600">
+              Uploading {uploadDone}/{uploadTotal}…
+            </div>
+          ) : null}
+
           <Button disabled={busy || !files || files.length === 0}>
-            {busy ? "Uploading…" : "Upload"}
+            {uploading ? "Uploading…" : "Upload"}
           </Button>
+
+          <p className="text-xs text-gray-500">
+            Tip: uploads are sent one-at-a-time to avoid server limits.
+          </p>
         </form>
       </Card>
 
       <Card className="p-6">
-        <div className="text-lg font-extrabold tracking-tight">
-          Reorder / Edit Photos
-        </div>
+        <div className="text-lg font-extrabold tracking-tight">Reorder / Edit Photos</div>
 
         <div className="mt-4 grid gap-3">
           {images.map((img, idx) => (
@@ -259,12 +298,7 @@ export default function AdminDay({ params }: { params: { id: string } }) {
                   placeholder="Optional caption"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => saveCaption(img.id)}
-                  >
+                  <Button variant="secondary" type="button" disabled={busy} onClick={() => saveCaption(img.id)}>
                     Save caption
                   </Button>
                   <Button
