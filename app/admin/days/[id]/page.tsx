@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Input, TextArea } from "@/components/ui";
 import { formatDateLongUTC } from "@/lib/date";
 
@@ -32,8 +32,6 @@ export default function AdminDay({ params }: { params: { id: string } }) {
   const [uploading, setUploading] = useState(false);
   const [uploadDone, setUploadDone] = useState(0);
   const [uploadTotal, setUploadTotal] = useState(0);
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function refresh() {
     const resp = await fetch(`/api/admin/day?dayId=${encodeURIComponent(dayId)}`);
@@ -130,7 +128,8 @@ export default function AdminDay({ params }: { params: { id: string } }) {
       else setMsg(`Uploaded ${ok} photo(s). ${failed} failed (see console).`);
 
       setFiles(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      // NOTE: we intentionally avoid using ref={...} on <Input />
+      // because your custom Input component likely does not forwardRef.
       refresh();
     } catch (err: any) {
       setMsg(err?.message ?? "Upload error.");
@@ -243,7 +242,6 @@ export default function AdminDay({ params }: { params: { id: string } }) {
           <div className="text-lg font-extrabold tracking-tight">Upload photos</div>
 
           <Input
-            ref={fileInputRef}
             type="file"
             multiple
             accept="image/*"
@@ -260,9 +258,7 @@ export default function AdminDay({ params }: { params: { id: string } }) {
             {uploading ? "Uploading…" : "Upload"}
           </Button>
 
-          <p className="text-xs text-gray-500">
-            Tip: uploads are sent one-at-a-time to avoid server limits.
-          </p>
+          <p className="text-xs text-gray-500">Tip: uploads are sent one-at-a-time to avoid server limits.</p>
         </form>
       </Card>
 
